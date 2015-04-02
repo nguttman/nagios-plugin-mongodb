@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python26
 
 #
 # A MongoDB Nagios check script
@@ -18,6 +18,7 @@
 #   - @Andor on github
 #   - Steven Richards - Captainkrtek on github
 #   - Max Vernimmen
+#   - Noah Guttman <noah.guttman@gmail.com>
 #
 # USAGE
 #
@@ -182,7 +183,7 @@ def main(argv):
         return err
 
     conn_time = time.time() - start
-    conn_time = round(conn_time, 0)
+    #conn_time = round(conn_time, 0)
 
     if action == "connections":
         return check_connections(con, warning, critical, perf_data)
@@ -309,7 +310,7 @@ def check_connect(host, port, warning, critical, perf_data, user, passwd, conn_t
     warning = warning or 3
     critical = critical or 6
     message = "Connection took %i seconds" % conn_time
-    message += performance_data(perf_data, [(conn_time, "connection_time", warning, critical)])
+    message += performance_data(perf_data, [("%.3fs" % conn_time, "connection_time", warning, critical)])
 
     return check_levels(conn_time, warning, critical, message)
 
@@ -323,11 +324,11 @@ def check_connections(con, warning, critical, perf_data):
         current = float(data['connections']['current'])
         available = float(data['connections']['available'])
 
-        used_percent = int(float(current / (available + current)) * 100)
+        used_percent = (float(current / (available + current)) * 100)
         message = "%i percent (%i of %i connections) used" % (used_percent, current, current + available)
-        message += performance_data(perf_data, [(used_percent, "used_percent", warning, critical),
-                (current, "current_connections"),
-                (available, "available_connections")])
+        message += performance_data(perf_data, [("%.2f%%" % used_percent, "used_connections", warning, critical),
+                ("%.0f" % current, "current_connections"),
+                ("%.0f" % available, "available_connections")])
         return check_levels(used_percent, warning, critical, message)
 
     except Exception, e:
@@ -413,7 +414,7 @@ def check_rep_lag(con, host, port, warning, critical, percent, perf_data, max_la
                         primary_timediff = replication_get_time_diff(con)
                         maximal_lag = int(float(maximal_lag) / float(primary_timediff) * 100)
                         message = "Maximal lag is " + str(maximal_lag) + " percents"
-                        message += performance_data(perf_data, [(maximal_lag, "replication_lag_percent", warning, critical)])
+                        message += performance_data(perf_data, [(maximal_lag, "replication_lag", warning, critical)])
                     else:
                         message = "Maximal lag is " + str(maximal_lag) + " seconds"
                         message += performance_data(perf_data, [(maximal_lag, "replication_lag", warning, critical)])
@@ -448,10 +449,10 @@ def check_rep_lag(con, host, port, warning, critical, percent, perf_data, max_la
                 else:
                     lag = 0
                 message = "Lag is " + str(lag) + " percents"
-                message += performance_data(perf_data, [(lag, "replication_lag_percent", warning, critical)])
+                message += performance_data(perf_data, [("%.1f%%" %lag, "replication_lag_percent", warning, critical)])
             else:
                 message = "Lag is " + str(lag) + " seconds"
-                message += performance_data(perf_data, [(lag, "replication_lag", warning, critical)])
+                message += performance_data(perf_data, [("%.1fs" % lag, "replication_lag", warning, critical)])
             return check_levels(lag, warning + slaveDelays[host_node['name']], critical + slaveDelays[host_node['name']], message)
         else:
             #
@@ -551,8 +552,8 @@ def check_memory(con, warning, critical, perf_data, mapped_memory):
             message += " %.2fGB mappedWithJournal" % mem_mapped_journal
         except:
             mem_mapped_journal = 0
-        message += performance_data(perf_data, [("%.2f" % mem_resident, "memory_usage", warning, critical),
-                    ("%.2f" % mem_mapped, "memory_mapped"), ("%.2f" % mem_virtual, "memory_virtual"), ("%.2f" % mem_mapped_journal, "mappedWithJournal")])
+        message += performance_data(perf_data, [("%.2fGB" % mem_resident, "memory_usage", warning, critical),
+                    ("%.2fGB" % mem_mapped, "memory_mapped"), ("%.2fGB" % mem_virtual, "memory_virtual"), ("%.2fGB" % mem_mapped_journal, "mappedWithJournal")])
         #added for unsupported systems like Solaris
         if mapped_memory and mem_resident == 0:
             return check_levels(mem_mapped, warning, critical, message)
@@ -589,7 +590,7 @@ def check_memory_mapped(con, warning, critical, perf_data):
             message += " %.2fGB mappedWithJournal" % mem_mapped_journal
         except:
             mem_mapped_journal = 0
-        message += performance_data(perf_data, [("%.2f" % mem_mapped, "memory_mapped"), ("%.2f" % mem_mapped_journal, "mappedWithJournal")])
+        message += performance_data(perf_data, [("%.2fGB" % mem_mapped, "memory_mapped"), ("%.2fGB" % mem_mapped_journal, "mappedWithJournal")])
 
         if not mem_mapped == -1:
             return check_levels(mem_mapped, warning, critical, message)
@@ -616,7 +617,7 @@ def check_lock(con, warning, critical, perf_data):
         else:
             lock_percentage = float(lockTime) / float(totalTime) * 100
         message = "Lock Percentage: %.2f%%" % lock_percentage
-        message += performance_data(perf_data, [("%.2f" % lock_percentage, "lock_percentage", warning, critical)])
+        message += performance_data(perf_data, [("%.2f%%" % lock_percentage, "lock", warning, critical)])
         return check_levels(lock_percentage, warning, critical, message)
 
     except Exception, e:
@@ -807,7 +808,7 @@ def check_all_databases_size(con, warning, critical, perf_data):
         data = con[database].command('dbstats')
         storage_size = round(data['storageSize'] / 1024 / 1024, 1)
         message += "; Database %s size: %.0f MB" % (database, storage_size)
-        perf_data_param.append((storage_size, database + "_database_size"))
+        perf_data_param.append(("%.0fMB" % storage_size, database + "_database_size"))
         total_storage_size += storage_size
 
     perf_data_param[0] = (total_storage_size, "total_size", warning, critical)
@@ -825,7 +826,7 @@ def check_database_size(con, database, warning, critical, perf_data):
         data = con[database].command('dbstats')
         storage_size = data['storageSize'] / 1024 / 1024
         if perf_data:
-            perfdata += " | database_size=%i;%i;%i" % (storage_size, warning, critical)
+            perfdata += " | database_size=%iMB;%i;%i" % (storage_size, warning, critical)
             #perfdata += " database=%s" %(database)
 
         if storage_size >= critical:
@@ -853,7 +854,7 @@ def check_database_indexes(con, database, warning, critical, perf_data):
         data = con[database].command('dbstats')
         index_size = data['indexSize'] / 1024 / 1024
         if perf_data:
-            perfdata += " | database_indexes=%i;%i;%i" % (index_size, warning, critical)
+            perfdata += " | database_indexes=%iMB;%i;%i" % (index_size, warning, critical)
 
         if index_size >= critical:
             print "CRITICAL - %s indexSize: %.0f MB %s" % (database, index_size, perfdata)
@@ -880,7 +881,7 @@ def check_collection_indexes(con, database, collection, warning, critical, perf_
         data = con[database].command('collstats', collection)
         total_index_size = data['totalIndexSize'] / 1024 / 1024
         if perf_data:
-            perfdata += " | collection_indexes=%i;%i;%i" % (total_index_size, warning, critical)
+            perfdata += " | collection_indexes=%iMB;%i;%i" % (total_index_size, warning, critical)
 
         if total_index_size >= critical:
             print "CRITICAL - %s.%s totalIndexSize: %.0f MB %s" % (database, collection, total_index_size, perfdata)
@@ -1333,9 +1334,9 @@ def check_connect_primary(con, warning, critical, perf_data):
             return err
 
         pconn_time = time.time() - start
-        pconn_time = round(pconn_time, 0)
+        #pconn_time = round(pconn_time, 0)
         message = "Connection to primary server " + data['primary'] + " took %i seconds" % pconn_time
-        message += performance_data(perf_data, [(pconn_time, "connection_time", warning, critical)])
+        message += performance_data(perf_data, [("%.3fs" %pconn_time, "connection_time", warning, critical)])
 
         return check_levels(pconn_time, warning, critical, message)
 
